@@ -1,0 +1,132 @@
+#
+# CoudFormation Snippet
+#
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev 
+    AllowedValues:
+      - dev
+      - qat
+      - prd
+    Description: Enter Evironment name
+
+  AMI:
+    Type: String
+    Description: Enter AMI Id.
+
+Mappings:
+  Environments:
+    dev:
+      DesiredCapacity: 1
+      MaxSize: 2
+      MinSize: 1
+      Subnets: subnet-Axxxx, subnet-Bxxxx
+      IamProfile: main-Ec2-role-dev
+      SecurityGroupIdA: sg-jenkins
+      SecurityGroupIdB: sg-ansible
+      CPUUtilization: 70
+      Keypair: UNIXKeyDV
+    qat:
+      DesiredCapacity: 1
+      MaxSize: 2
+      MinSize: 1
+      Subnets: subnet-Axxxx, subnet-Bxxxx
+      IamProfile: main-Ec2-role-qat
+      SecurityGroupIdA: sg-jenkins
+      SecurityGroupIdB: sg-ansible
+      CPUUtilization: 70
+      Keypair: UNIXKeyQA
+    prd:
+      DesiredCapacity: 1
+      MaxSize: 2
+      MinSize: 1
+      Subnets: subnet-Axxxx, subnet-Bxxxx
+      IamProfile: main-Ec2-role-prd
+      SecurityGroupIdA: sg-jenkins
+      SecurityGroupIdB: sg-ansible
+      CPUUtilization: 70
+      Keypair: UNIXKeyPRD
+
+Resources:
+  ABCAutoscale:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub "abc-asgroup-${Env}"
+      Cooldown: 300
+      DefaultInstanceWarmup: Number
+      DesiredCapacity: !FindInMap [Environments, !Ref Env, DesiredCapacity]
+      HealthCheckType: EC2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref [ABCLauchTemplate]
+      MaxSize: !FindInMap [Environments, !Ref Env, MaxSize] # Required
+      MetricsCollection: 
+        - Granularity: 1Miute
+      MinSize: !FindInMap [Environments, !Ref Env, MinSize] # Required
+      NewInstancesProtectedFromScaleIn: false
+      Tags: 
+        - Key: Owner
+          PropagateAtLaunch: true
+          Value: abc
+        - Key: Application
+          PropagateAtLaunch: true
+          Value: GSD
+      VPCZoneIdentifier: 
+        - !FindInMap [Environment, !Ref Env, Subnets]
+
+  ABCLauchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+    LaunchTemplateData:
+    BlockDeviceMappings:
+      -
+    EbsOptimized: true
+    ImageId: !Ref AMI
+    InstanceInitiatedShutdownBehavior: "String"
+    InstanceType: m5.8xlarge
+    KernelId: "String"
+    KeyName: !FindInMap [Environment, !Ref Env, Keypair]
+    Monitoring:
+      Enabled: true
+    SecurityGroupIds:
+      - !FindInMap [Environment, !Ref Env, SecurityGroupIdA]
+      - !FindInMap [Environment, !Ref Env, SecurityGroupIdB]
+    UserData: "String"
+    LaunchTemplateName: !Sub 'abc-template-${Env}'
+    TagSpecifications: 
+      - ResourceType: instance
+        Tags: 
+          - Key: Name
+            Vaule: !Sub abc-${Env}
+          - Key: Application
+            Vaule: GSD
+          - Key: Owner
+            Vaule: abc
+
+  ASCPUPolicy:
+    LogicalID:
+      Type: AWS::AutoScaling::ScalingPolicy
+      Properties:
+        AdjustmentType: "String"
+        AutoScalingGroupName: !Sub 'abc-asgroup-${Env}' # Required
+        Cooldown: "String"
+        EstimatedInstanceWarmup: 300
+        PolicyType: TargetTrackingScaling
+        PredictiveScalingConfiguration:
+          MaxCapacityBreachBehavior: "String"
+          MaxCapacityBuffer: Number
+          MetricSpecifications:
+            -
+          Mode: "String"
+          SchedulingBufferTime: Number
+        ScalingAdjustment: Number
+        StepAdjustments: 
+          StepAdjustments
+        TargetTrackingConfiguration:
+          PredefinedMetricSpecification:
+            PredefinedMetricType: ASGAverageCPUUtilization
+          TargetValue: !FindInMap [Environment, !Ref Env, CPUUtilization]
+
+
+
